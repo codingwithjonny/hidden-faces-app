@@ -22,7 +22,8 @@ h1 small{display:block;color:var(--gold);font-size:13px;letter-spacing:3px;text-
 .name{display:block;font-size:19px;font-weight:bold;line-height:1.08}
 #player{background:#070907}
 #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;display:none}
-#youtubeWrap{position:absolute;inset:0;background:#000;display:none}
+#youtubeWrap{position:absolute;inset:0;background:#000;display:none;opacity:0;pointer-events:none;transition:opacity .22s ease}
+#youtubeWrap.on{opacity:1}
 #youtubePlayer,#youtubePlayer iframe{width:100%;height:100%;border:0}
 #wall{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:5px;background:#111812}
 .tile{position:relative;overflow:hidden;background:linear-gradient(145deg,#24382b,#111812)}
@@ -85,7 +86,7 @@ h1 small{display:block;color:var(--gold);font-size:13px;letter-spacing:3px;text-
 (function(){
 "use strict";
 
-const BUILD_ID="2026.10.07.5";
+const BUILD_ID="2026.10.07.6";
 const CLOUD="ayyh0pzg";
 const EVENT="hiddenfaces2026";
 const GALLERY_MS=60000;
@@ -115,6 +116,7 @@ const tiles=[...document.querySelectorAll(".tile")];
 let selected=Math.max(0,PROFILES.findIndex(p=>p.id===localStorage.getItem("hiddenFacesTvProfile")));
 let active=null,galleryActive=false,phaseTimer=null,refreshTimer=null,knownIds=new Set();
 let playlistCursor=0,ytPlayer=null,ytApiPromise=null,ytStartGuard=null;
+let ytRevealTimer=null,ytWarmupStarted=false,ytRevealed=false,ytQuality="";
 let slots=tiles.map((tile,index)=>({index,tile,img:tile.querySelector("img"),photo:null}));
 
 function renderMenu(){
@@ -182,22 +184,95 @@ function loadYouTubeApi(){
   return ytApiPromise;
 }
 
-function youtubeEnded(event){
-  if(window.YT&&event.data===YT.PlayerState.ENDED){
+function tryDisableCaptions(){
+  if(!ytPlayer)return;
+  try{
+    if(typeof ytPlayer.unloadModule==="function"){
+      ytPlayer.unloadModule("captions");
+      ytPlayer.unloadModule("cc");
+    }
+  }catch(e){}
+}
+
+function qualityRank(q){
+  return ({small:1,medium:2,large:3,hd720:4,hd1080:5,highres:6})[q]||0;
+}
+
+function revealYouTube(){
+  if(ytRevealed||!ytPlayer)return;
+  ytRevealed=true;
+  clearTimeout(ytRevealTimer);
+  clearTimeout(ytStartGuard);
+  tryDisableCaptions();
+  try{
+    ytPlayer.seekTo(0,true);
+    ytPlayer.unMute();
+    ytPlayer.playVideo();
+  }catch(e){}
+  wall.classList.add("hidden");
+  empty.classList.add("hidden");
+  youtubeWrap.classList.add("on");
+  badge.innerHTML="<b>NOW</b> Video";
+  status.textContent="";
+  counter.textContent="";
+}
+
+function startYouTubeWarmup(){
+  if(ytWarmupStarted||!ytPlayer)return;
+  ytWarmupStarted=true;
+  try{
+    ytPlayer.mute();
+    ytPlayer.playVideo();
+  }catch(e){}
+  // Give YouTube a short window to adapt upward, but never hold the gallery too long.
+  ytRevealTimer=setTimeout(revealYouTube,4000);
+}
+
+function youtubeStateChanged(event){
+  if(!window.YT)return;
+  if(event.data===YT.PlayerState.PLAYING){
+    tryDisableCaptions();
+    startYouTubeWarmup();
+  }else if(event.data===YT.PlayerState.ENDED){
     clearTimeout(ytStartGuard);
+    clearTimeout(ytRevealTimer);
     showGallery();
   }
 }
 
+function youtubeQualityChanged(event){
+  ytQuality=String(event.data||"");
+  if(!ytRevealed&&qualityRank(ytQuality)>=qualityRank("hd720")){
+    // HD arrived quickly enough; reveal immediately instead of waiting the full warmup window.
+    revealYouTube();
+  }
+}
+
+function youtubeApiChanged(){
+  tryDisableCaptions();
+}
+
 function youtubeError(){
   clearTimeout(ytStartGuard);
-  status.textContent="Video unavailable. Returning to the live gallery.";
-  setTimeout(showGallery,1200);
+  clearTimeout(ytRevealTimer);
+  status.textContent="";
+  setTimeout(showGallery,700);
 }
 
 async function playYouTube(videoId){
   youtubeWrap.style.display="block";
+  youtubeWrap.classList.remove("on");
   video.style.display="none";
+  ytWarmupStarted=false;
+  ytRevealed=false;
+  ytQuality="";
+
+  // Keep the gallery visible while YouTube starts and negotiates stream quality.
+  wall.classList.remove("hidden");
+  badge.innerHTML="<b>LIVE</b> Gallery";
+  status.textContent="";
+  counter.textContent="";
+
   try{
     await loadYouTubeApi();
     if(!ytPlayer){
@@ -210,15 +285,23 @@ async function playYouTube(videoId){
           playsinline:1,
           fs:0,
           disablekb:1,
-          iv_load_policy:3
+          iv_load_policy:3,
+          cc_load_policy:3
         },
         events:{
-          onReady:e=>{e.target.loadVideoById(videoId);e.target.playVideo();},
-          onStateChange:youtubeEnded,
+          onReady:e=>{
+            try{e.target.mute()}catch(err){}
+            e.target.loadVideoById(videoId);
+            e.target.playVideo();
+          },
+          onStateChange:youtubeStateChanged,
+          onPlaybackQualityChange:youtubeQualityChanged,
+          onApiChange:youtubeApiChanged,
           onError:youtubeError
         }
       });
     }else{
+      try{ytPlayer.mute()}catch(e){}
       ytPlayer.loadVideoById(videoId);
       ytPlayer.playVideo();
     }
@@ -228,6 +311,8 @@ async function playYouTube(videoId){
         const state=ytPlayer&&ytPlayer.getPlayerState?ytPlayer.getPlayerState():-1;
         if(window.YT&&state!==YT.PlayerState.PLAYING&&state!==YT.PlayerState.BUFFERING){
           youtubeError();
+        }else if(!ytRevealed){
+          revealYouTube();
         }
       }catch(e){youtubeError();}
     },10000);
@@ -252,6 +337,7 @@ function playVideo(){
     return;
   }
 
+  youtubeWrap.classList.remove("on");
   youtubeWrap.style.display="none";
   video.style.display="block";
   video.src=media.src||"";
@@ -261,6 +347,9 @@ function playVideo(){
 
 function releaseVideo(){
   clearTimeout(ytStartGuard);
+  clearTimeout(ytRevealTimer);
+  ytWarmupStarted=false;
+  ytRevealed=false;
   try{video.pause()}catch(e){}
   video.removeAttribute("src");
   try{video.load()}catch(e){}
@@ -277,7 +366,7 @@ async function showGallery(){
   releaseVideo();
   wall.classList.remove("hidden");
   badge.innerHTML="<b>LIVE</b> Gallery";
-  status.textContent="Five live guest photos. New uploads replace the oldest photo automatically.";
+  status.textContent="";
   await fetchGallery();
   if(hasMedia(active)){
     phaseTimer=setTimeout(()=>{
@@ -386,16 +475,14 @@ async function fetchGallery(){
     const photos=normalizeResources(j.resources);
     applyGallery(photos);
     const loaded=slots.filter(s=>s.photo).length;
-    status.textContent=loaded
-      ?"Live guest gallery • new photos replace the oldest tile automatically."
-      :"Waiting for the first guest photo.";
+    status.textContent="";
   }catch(e){
     if(!slots.some(s=>s.photo)){
       empty.classList.remove("hidden");
       emptyTitle.textContent="Gallery connection interrupted";
       emptyText.textContent="The TV will keep retrying automatically.";
     }
-    status.textContent="Trying to reconnect to the shared gallery…";
+    status.textContent="";
   }
 }
 
