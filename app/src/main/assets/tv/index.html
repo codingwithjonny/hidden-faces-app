@@ -10,16 +10,29 @@ h1{margin:0 0 26px;font-size:38px}h1 small{display:block;color:var(--gold);font-
 .card.sel{border-color:var(--gold);box-shadow:0 0 0 5px rgba(224,162,38,.16);transform:scale(1.025)}
 .num{display:block;color:var(--gold);font-size:13px;font-weight:bold;letter-spacing:2px;margin-bottom:12px}.name{display:block;font-size:22px;font-weight:bold;line-height:1.1}
 #player{background:#000}.fill{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.slide{opacity:0;transition:opacity .7s ease;background:#000}.slide.on{opacity:1}
 .top{position:absolute;left:28px;right:28px;top:24px;display:flex;justify-content:space-between;z-index:4;text-shadow:0 2px 10px #000;font-size:25px;font-weight:bold}
 .badge{font-size:13px;background:rgba(17,24,18,.8);padding:10px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.18)}.badge b{color:var(--gold)}
-.bottom{position:absolute;left:28px;right:28px;bottom:22px;display:flex;justify-content:space-between;z-index:4;color:#ddd;text-shadow:0 2px 10px #000;font-size:13px}
+.bottom{position:absolute;left:28px;right:28px;bottom:22px;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;z-index:4;color:#ddd;text-shadow:0 2px 10px #000;font-size:13px}
+#status{max-width:72%}.counter{font-weight:bold;color:#fff;white-space:nowrap}
 #empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#1D2E23,#0B0E0C);z-index:2;text-align:center;padding:80px}#empty h2{font-size:40px;margin:0 0 14px}#empty p{font-size:19px;color:var(--muted)}
+.progress{position:absolute;left:0;right:0;bottom:0;height:4px;z-index:5;background:rgba(255,255,255,.12)}#progressFill{height:100%;width:0;background:var(--gold)}
+#progressFill.run{animation:photoProgress 5s linear forwards}@keyframes photoProgress{from{width:0}to{width:100%}}
 </style></head><body tabindex="0">
 <section id="menu" class="screen"><h1><small>The Source</small>Hidden Faces 2026</h1><div id="grid" class="grid"></div></section>
-<section id="player" class="screen hidden"><video id="video" class="fill" playsinline></video><img id="photo" class="fill" alt=""><div id="empty"><div><h2 id="emptyTitle">Loading gallery…</h2><p id="emptyText">Guest photos will appear automatically.</p></div></div><div class="top"><span id="location"></span><span id="badge" class="badge"><b>LIVE</b> Gallery</span></div><div class="bottom"><span id="status">Connected to the Hidden Faces gallery.</span><span>BACK change location</span></div></section>
+<section id="player" class="screen hidden">
+  <video id="video" class="fill" playsinline></video>
+  <img id="photoA" class="fill slide" alt="">
+  <img id="photoB" class="fill slide" alt="">
+  <div id="empty"><div><h2 id="emptyTitle">Loading gallery…</h2><p id="emptyText">Guest photos will appear automatically.</p></div></div>
+  <div class="top"><span id="location"></span><span id="badge" class="badge"><b>LIVE</b> Gallery</span></div>
+  <div class="bottom"><span id="status">Connecting to the Hidden Faces gallery…</span><span id="counter" class="counter"></span></div>
+  <div class="progress"><div id="progressFill"></div></div>
+</section>
 <script>
 (function(){
-const CLOUD="ayyh0pzg",EVENT="hiddenfaces2026",GALLERY_MS=60000,PHOTO_MS=8000,REFRESH_MS=20000;
+"use strict";
+const CLOUD="ayyh0pzg",EVENT="hiddenfaces2026",GALLERY_MS=60000,PHOTO_MS=5000,REFRESH_MS=20000;
 const PROFILES=[
 {id:"dining",name:"Dining Hall",video:""},
 {id:"admin",name:"Admin Building",video:""},
@@ -34,22 +47,198 @@ const PROFILES=[
 {id:"chapel",name:"Future Chapel",video:""},
 {id:"store",name:"General Store",video:""}
 ];
-const $=id=>document.getElementById(id),menu=$("menu"),player=$("player"),grid=$("grid"),video=$("video"),photo=$("photo"),empty=$("empty"),emptyTitle=$("emptyTitle"),emptyText=$("emptyText"),locationEl=$("location"),badge=$("badge"),status=$("status");
-let selected=Math.max(0,PROFILES.findIndex(p=>p.id===localStorage.getItem("hiddenFacesTvProfile")));let active=null,photos=[],photoIndex=0,photoTimer,phaseTimer,refreshTimer;
-function render(){grid.innerHTML="";PROFILES.forEach((p,i)=>{const b=document.createElement("button");b.className="card"+(i===selected?" sel":"");b.innerHTML='<span class="num">SCREEN '+String(i+1).padStart(2,"0")+'</span><span class="name">'+p.name+'</span>';b.onclick=()=>{selected=i;start()};grid.appendChild(b);});}
-function move(dx,dy){const cols=4,row=Math.floor(selected/cols),col=selected%cols;let nr=Math.max(0,Math.min(2,row+dy)),nc=Math.max(0,Math.min(3,col+dx));selected=Math.min(PROFILES.length-1,nr*cols+nc);render();}
-function start(){active=PROFILES[selected];localStorage.setItem("hiddenFacesTvProfile",active.id);menu.classList.add("hidden");player.classList.remove("hidden");locationEl.textContent=active.name;clearAll();begin();refreshTimer=setInterval(fetchGallery,REFRESH_MS);}
-function begin(){active&&active.video?playVideo():showGallery("Gallery mode is active. Video can be added later.");}
-function playVideo(){clearTimeout(phaseTimer);clearInterval(photoTimer);photoTimer=null;photo.style.opacity=0;empty.classList.add("hidden");badge.innerHTML="<b>NOW</b> Video";status.textContent="Streaming this location's film.";video.style.display="block";video.src=active.video;video.currentTime=0;video.play().catch(()=>showGallery("Video unavailable. Gallery mode is active."));}
-function releaseVideo(){try{video.pause()}catch(e){}video.removeAttribute("src");try{video.load()}catch(e){}video.style.display="none";}
-function showGallery(note){clearTimeout(phaseTimer);releaseVideo();badge.innerHTML="<b>LIVE</b> Gallery";status.textContent=note||"Guest gallery • video returns in 60 seconds.";fetchGallery().finally(startPhotoRotation);phaseTimer=setTimeout(()=>{active&&active.video?playVideo():showGallery("Gallery mode is active. Video not assigned yet.");},GALLERY_MS);}
-function startPhotoRotation(){clearInterval(photoTimer);photoTimer=null;if(!photos.length){empty.classList.remove("hidden");emptyTitle.textContent="Waiting for guest photos";emptyText.textContent="Photos tagged for Hidden Faces 2026 will appear automatically.";photo.style.opacity=0;return;}empty.classList.add("hidden");paintPhoto();photoTimer=setInterval(()=>{photoIndex=(photoIndex+1)%photos.length;paintPhoto();},PHOTO_MS);}
-function paintPhoto(){if(!photos.length)return;photo.src=photos[photoIndex%photos.length];photo.style.opacity=1;}
-async function fetchGallery(){try{const r=await fetch("https://res.cloudinary.com/"+CLOUD+"/image/list/"+EVENT+".json?_="+Math.floor(Date.now()/REFRESH_MS),{cache:"no-store"});if(r.status===404){photos=[];return}if(!r.ok)throw 0;const j=await r.json();photos=(j.resources||[]).sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||""))).map(x=>"https://res.cloudinary.com/"+CLOUD+"/image/upload/c_fill,w_1920,h_1080,q_auto,f_auto/"+x.public_id+".jpg");if(photos.length)empty.classList.add("hidden");}catch(e){if(!photos.length){empty.classList.remove("hidden");emptyTitle.textContent="Gallery connection interrupted";emptyText.textContent="The TV will retry automatically.";}}}
-function clearAll(){clearInterval(photoTimer);clearTimeout(phaseTimer);clearInterval(refreshTimer);photoTimer=phaseTimer=refreshTimer=null;}
-function back(){if(player.classList.contains("hidden"))return;clearAll();releaseVideo();player.classList.add("hidden");menu.classList.remove("hidden");render();}
-video.addEventListener("ended",()=>showGallery());video.addEventListener("error",()=>{if(active&&active.video)showGallery("Video unavailable. Gallery mode is active.");});
-document.addEventListener("keydown",e=>{const k=e.key||({19:"ArrowUp",20:"ArrowDown",21:"ArrowLeft",22:"ArrowRight",23:"Enter",66:"Enter"}[e.keyCode]||"");if(!player.classList.contains("hidden")){if(k==="Escape"||k==="Backspace"){e.preventDefault();back()}return;}if(k==="ArrowLeft"){e.preventDefault();move(-1,0)}else if(k==="ArrowRight"){e.preventDefault();move(1,0)}else if(k==="ArrowUp"){e.preventDefault();move(0,-1)}else if(k==="ArrowDown"){e.preventDefault();move(0,1)}else if(k==="Enter"){e.preventDefault();start()}});
-window.TV={androidBack:back};render();document.body.focus();
+const $=id=>document.getElementById(id);
+const menu=$("menu"),player=$("player"),grid=$("grid"),video=$("video"),photoA=$("photoA"),photoB=$("photoB"),empty=$("empty"),emptyTitle=$("emptyTitle"),emptyText=$("emptyText"),locationEl=$("location"),badge=$("badge"),status=$("status"),counter=$("counter"),progressFill=$("progressFill");
+let selected=Math.max(0,PROFILES.findIndex(p=>p.id===localStorage.getItem("hiddenFacesTvProfile")));
+let active=null,photos=[],photoIndex=0,visiblePhoto=0,photoTimer=null,phaseTimer=null,refreshTimer=null,galleryActive=false,loadingPhoto=false;
+
+function render(){
+  grid.innerHTML="";
+  PROFILES.forEach((p,i)=>{
+    const b=document.createElement("button");
+    b.className="card"+(i===selected?" sel":"");
+    b.innerHTML='<span class="num">SCREEN '+String(i+1).padStart(2,"0")+'</span><span class="name">'+p.name+'</span>';
+    b.onclick=()=>{selected=i;start()};
+    grid.appendChild(b);
+  });
+}
+function move(dx,dy){
+  const cols=4,row=Math.floor(selected/cols),col=selected%cols;
+  let nr=Math.max(0,Math.min(2,row+dy)),nc=Math.max(0,Math.min(3,col+dx));
+  selected=Math.min(PROFILES.length-1,nr*cols+nc);render();
+}
+function start(){
+  active=PROFILES[selected];
+  localStorage.setItem("hiddenFacesTvProfile",active.id);
+  menu.classList.add("hidden");player.classList.remove("hidden");
+  locationEl.textContent=active.name;
+  clearAll();begin();
+  refreshTimer=setInterval(fetchGallery,REFRESH_MS);
+}
+function begin(){active&&active.video?playVideo():showGallery("Showing every guest photo in a continuous slideshow.");}
+function playVideo(){
+  galleryActive=false;stopPhotoTimer();clearTimeout(phaseTimer);
+  photoA.classList.remove("on");photoB.classList.remove("on");
+  counter.textContent="";resetProgress();
+  empty.classList.add("hidden");
+  badge.innerHTML="<b>NOW</b> Video";status.textContent="Streaming this location's film.";
+  video.style.display="block";video.src=active.video;video.currentTime=0;
+  video.play().catch(()=>showGallery("Video unavailable. Continuing the photo gallery."));
+}
+function releaseVideo(){
+  try{video.pause()}catch(e){}
+  video.removeAttribute("src");try{video.load()}catch(e){}
+  video.style.display="none";
+}
+async function showGallery(note){
+  galleryActive=true;clearTimeout(phaseTimer);releaseVideo();
+  badge.innerHTML="<b>LIVE</b> Gallery";
+  status.textContent=note||"Showing every guest photo in a continuous slideshow.";
+  await fetchGallery();
+  if(!galleryActive)return;
+  startPhotoRotation();
+  if(active&&active.video){
+    phaseTimer=setTimeout(()=>{if(galleryActive)playVideo();},GALLERY_MS);
+  }
+}
+function stopPhotoTimer(){
+  if(photoTimer){clearTimeout(photoTimer);photoTimer=null;}
+}
+function resetProgress(){
+  progressFill.classList.remove("run");
+  progressFill.style.width="0";
+}
+function runProgress(){
+  progressFill.classList.remove("run");
+  void progressFill.offsetWidth;
+  progressFill.classList.add("run");
+}
+function startPhotoRotation(){
+  stopPhotoTimer();
+  if(!photos.length){
+    empty.classList.remove("hidden");
+    emptyTitle.textContent="Waiting for guest photos";
+    emptyText.textContent="Photos tagged for Hidden Faces 2026 will appear automatically.";
+    counter.textContent="0 photos";resetProgress();
+    return;
+  }
+  empty.classList.add("hidden");
+  if(photoIndex>=photos.length)photoIndex=0;
+  showPhoto(photoIndex,true);
+}
+function showPhoto(index,immediate){
+  if(!galleryActive||!photos.length||loadingPhoto)return;
+  index=((index%photos.length)+photos.length)%photos.length;
+  const url=photos[index];
+  loadingPhoto=true;
+  const nextEl=visiblePhoto===0?photoB:photoA;
+  const currentEl=visiblePhoto===0?photoA:photoB;
+  const preload=new Image();
+  preload.onload=()=>{
+    if(!galleryActive){loadingPhoto=false;return;}
+    nextEl.src=url;
+    nextEl.classList.add("on");
+    currentEl.classList.remove("on");
+    visiblePhoto=visiblePhoto===0?1:0;
+    photoIndex=index;
+    loadingPhoto=false;
+    counter.textContent="Photo "+(photoIndex+1)+" of "+photos.length;
+    status.textContent=photos.length===1
+      ?"1 guest photo loaded • checking for new uploads automatically."
+      :photos.length+" guest photos • rolling gallery • 5 seconds each.";
+    runProgress();
+    stopPhotoTimer();
+    photoTimer=setTimeout(nextPhoto,PHOTO_MS);
+  };
+  preload.onerror=()=>{
+    loadingPhoto=false;
+    if(photos.length>1){
+      photos.splice(index,1);
+      if(photoIndex>=photos.length)photoIndex=0;
+      showPhoto(photoIndex,false);
+    }else{
+      empty.classList.remove("hidden");
+      emptyTitle.textContent="Photo could not load";
+      emptyText.textContent="The TV will retry the gallery automatically.";
+      counter.textContent="";
+    }
+  };
+  preload.src=url;
+}
+function nextPhoto(){
+  if(!galleryActive)return;
+  if(photos.length<2){
+    runProgress();
+    photoTimer=setTimeout(async()=>{
+      await fetchGallery();
+      if(!galleryActive)return;
+      if(photos.length>1)showPhoto((photoIndex+1)%photos.length,false);
+      else nextPhoto();
+    },PHOTO_MS);
+    return;
+  }
+  showPhoto((photoIndex+1)%photos.length,false);
+}
+async function fetchGallery(){
+  try{
+    const r=await fetch("https://res.cloudinary.com/"+CLOUD+"/image/list/"+EVENT+".json?_="+Date.now(),{cache:"no-store"});
+    if(r.status===404){if(!photos.length)photos=[];return;}
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const j=await r.json();
+    const seen=new Set(),next=[];
+    (j.resources||[])
+      .slice()
+      .sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")))
+      .forEach(x=>{
+        if(!x.public_id||seen.has(x.public_id))return;
+        seen.add(x.public_id);
+        next.push("https://res.cloudinary.com/"+CLOUD+"/image/upload/c_fill,w_1920,h_1080,q_auto,f_auto/"+x.public_id+".jpg");
+      });
+    if(next.length){
+      const currentUrl=photos[photoIndex];
+      photos=next;
+      const currentAt=currentUrl?photos.indexOf(currentUrl):-1;
+      if(currentAt>=0)photoIndex=currentAt;
+      else if(photoIndex>=photos.length)photoIndex=0;
+      empty.classList.add("hidden");
+      counter.textContent="Photo "+(photoIndex+1)+" of "+photos.length;
+    }
+  }catch(e){
+    if(!photos.length){
+      empty.classList.remove("hidden");
+      emptyTitle.textContent="Gallery connection interrupted";
+      emptyText.textContent="The TV will keep retrying automatically.";
+      counter.textContent="";
+    }
+  }
+}
+function clearAll(){
+  galleryActive=false;loadingPhoto=false;
+  stopPhotoTimer();clearTimeout(phaseTimer);clearInterval(refreshTimer);
+  phaseTimer=refreshTimer=null;resetProgress();
+}
+function back(){
+  if(player.classList.contains("hidden"))return;
+  clearAll();releaseVideo();
+  player.classList.add("hidden");menu.classList.remove("hidden");render();
+}
+video.addEventListener("ended",()=>showGallery());
+video.addEventListener("error",()=>{if(active&&active.video)showGallery("Video unavailable. Continuing the photo gallery.");});
+document.addEventListener("keydown",e=>{
+  const k=e.key||({19:"ArrowUp",20:"ArrowDown",21:"ArrowLeft",22:"ArrowRight",23:"Enter",66:"Enter"}[e.keyCode]||"");
+  if(!player.classList.contains("hidden")){
+    if(k==="Escape"||k==="Backspace"){e.preventDefault();back();return;}
+    if(galleryActive&&k==="ArrowRight"){e.preventDefault();stopPhotoTimer();showPhoto((photoIndex+1)%Math.max(1,photos.length),false);return;}
+    if(galleryActive&&k==="ArrowLeft"){e.preventDefault();stopPhotoTimer();showPhoto((photoIndex-1+Math.max(1,photos.length))%Math.max(1,photos.length),false);return;}
+    return;
+  }
+  if(k==="ArrowLeft"){e.preventDefault();move(-1,0)}
+  else if(k==="ArrowRight"){e.preventDefault();move(1,0)}
+  else if(k==="ArrowUp"){e.preventDefault();move(0,-1)}
+  else if(k==="ArrowDown"){e.preventDefault();move(0,1)}
+  else if(k==="Enter"){e.preventDefault();start()}
+});
+window.TV={androidBack:back};
+render();document.body.focus();
 })();
 </script></body></html>
