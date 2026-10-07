@@ -110,6 +110,7 @@ let active=null;
 let galleryActive=false;
 let phaseTimer=null;
 let refreshTimer=null;
+let knownIds=new Set();
 let slots=tiles.map((tile,index)=>({index,tile,img:tile.querySelector("img"),photo:null}));
 
 function renderMenu(){
@@ -209,19 +210,23 @@ function oldestSlot(){
 
 function replaceSlot(slot,photo){
   if(!slot||!photo)return;
+  const previous=slot.photo;
+  slot.photo=photo;
   const preload=new Image();
   preload.onload=()=>{
     slot.img.classList.remove("on");
     setTimeout(()=>{
       slot.img.src=photo.url;
-      slot.photo=photo;
       slot.tile.classList.remove("empty");
       void slot.img.offsetWidth;
       slot.img.classList.add("on");
       updateCounter();
     },180);
   };
-  preload.onerror=()=>{};
+  preload.onerror=()=>{
+    slot.photo=previous;
+    updateCounter();
+  };
   preload.src=photo.url;
 }
 
@@ -260,18 +265,18 @@ function applyGallery(allPhotos){
     return;
   }
 
-  if(!slots.some(s=>s.photo)){
+  if(!knownIds.size){
+    allPhotos.forEach(p=>knownIds.add(p.id));
     fillInitial(allPhotos);
     return;
   }
 
-  const visible=currentIds();
-  const incoming=allPhotos.filter(p=>!visible.has(p.id));
+  const incoming=allPhotos.filter(p=>!knownIds.has(p.id));
+  allPhotos.forEach(p=>knownIds.add(p.id));
 
   incoming.forEach(photo=>{
     const slot=oldestSlot();
     replaceSlot(slot,photo);
-    visible.add(photo.id);
   });
 
   updateCounter();
