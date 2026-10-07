@@ -29,8 +29,8 @@ h1 small{display:block;color:var(--gold);font-size:13px;letter-spacing:3px;text-
 .tile{position:relative;overflow:hidden;background:linear-gradient(145deg,#24382b,#111812)}
 .tile img{position:absolute;left:0;right:0;top:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.02);transition:opacity .75s ease,transform 1.1s ease,height .2s ease}
 .tile img.on{opacity:1;transform:scale(1)}
-.tile.has-caption img{height:calc(100% - 48px)}
-.photo-caption{position:absolute;left:0;right:0;bottom:0;min-height:48px;display:none;align-items:center;padding:8px 12px;background:#152219;color:#F7F4EE;font-size:15px;line-height:1.15;font-weight:600;border-top:1px solid rgba(247,244,238,.1);overflow:hidden}
+.tile.has-caption img{height:100%}
+.photo-caption{position:absolute;left:8px;right:8px;bottom:8px;min-height:32px;display:none;align-items:center;padding:6px 9px;background:rgba(11,18,13,.68);color:#F7F4EE;font-size:13px;line-height:1.12;font-weight:500;border:1px solid rgba(247,244,238,.10);border-radius:8px;overflow:hidden;backdrop-filter:blur(3px);text-shadow:0 1px 4px rgba(0,0,0,.65)}
 .tile.has-caption .photo-caption{display:flex}
 .photo-caption span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .tile.empty:after{content:"Hidden Faces";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(247,244,238,.18);font-size:20px;font-weight:bold;letter-spacing:2px;text-transform:uppercase}
@@ -90,7 +90,7 @@ h1 small{display:block;color:var(--gold);font-size:13px;letter-spacing:3px;text-
 (function(){
 "use strict";
 
-const BUILD_ID="2026.10.07.7";
+const BUILD_ID="2026.10.07.8";
 const CLOUD="ayyh0pzg";
 const EVENT="hiddenfaces2026";
 const GALLERY_MS=60000;
