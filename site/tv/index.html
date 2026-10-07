@@ -12,14 +12,14 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0B0E0C;col
 button{font:inherit}
 .screen{position:fixed;inset:0}
 .hidden{display:none!important}
-#menu{padding:44px 56px 38px;background:radial-gradient(circle at 20% 0%,#35523e 0,var(--pine) 38%,#111812 100%)}
-h1{margin:0 0 26px;font-size:38px}
-h1 small{display:block;color:var(--gold);font-size:15px;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;height:calc(100vh - 120px)}
-.card{border:2px solid rgba(247,244,238,.13);border-radius:20px;background:rgba(247,244,238,.055);color:var(--bone);padding:22px 24px;text-align:left;outline:none}
+#menu{display:flex;flex-direction:column;padding:28px 48px 30px;background:radial-gradient(circle at 20% 0%,#35523e 0,var(--pine) 38%,#111812 100%)}
+h1{flex:none;margin:0 0 18px;font-size:34px;line-height:1.05}
+h1 small{display:block;color:var(--gold);font-size:13px;letter-spacing:3px;text-transform:uppercase;margin-bottom:6px}
+.grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:14px}
+.card{min-height:0;border:2px solid rgba(247,244,238,.13);border-radius:18px;background:rgba(247,244,238,.055);color:var(--bone);padding:16px 20px;text-align:left;outline:none;overflow:hidden}
 .card.sel{border-color:var(--gold);box-shadow:0 0 0 5px rgba(224,162,38,.16);transform:scale(1.025)}
-.num{display:block;color:var(--gold);font-size:13px;font-weight:bold;letter-spacing:2px;margin-bottom:12px}
-.name{display:block;font-size:22px;font-weight:bold;line-height:1.1}
+.num{display:block;color:var(--gold);font-size:12px;font-weight:bold;letter-spacing:2px;margin-bottom:8px}
+.name{display:block;font-size:19px;font-weight:bold;line-height:1.08}
 #player{background:#070907}
 #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;display:none}
 #wall{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:5px;background:#111812}
