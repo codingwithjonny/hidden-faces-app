@@ -1,0 +1,13 @@
+plugins { id 'com.android.application' }
+android {
+  namespace 'org.iamthesource.hiddenfaces.tv'
+  compileSdk 35
+  defaultConfig {
+    applicationId "org.iamthesource.hiddenfaces.tv"
+    minSdk 23
+    targetSdk 35
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+dependencies { }
