@@ -32,12 +32,13 @@ h1 small{display:block;color:var(--gold);font-size:13px;letter-spacing:3px;text-
 .badge{font-size:13px;background:rgba(17,24,18,.8);padding:10px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.18)}
 .badge b{color:var(--gold)}
 .bottom{position:absolute;left:28px;right:28px;bottom:20px;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;z-index:4;color:#eee;text-shadow:0 2px 10px #000;font-size:13px}
-#status{max-width:60%}
-.counter{font-weight:bold;color:#fff;white-space:nowrap;margin-right:190px}
-.qr-card{position:absolute;right:24px;bottom:54px;z-index:6;width:178px;padding:10px 10px 12px;background:rgba(247,244,238,.96);border-radius:16px;text-align:center;box-shadow:0 6px 28px rgba(0,0,0,.35);color:#1D2E23;text-shadow:none}
-.qr-card img{display:block;width:158px;height:158px;margin:0 auto 7px;border-radius:6px}
-.qr-card strong{display:block;font-size:14px;line-height:1.1;letter-spacing:.04em;text-transform:uppercase}
-.qr-card span{display:block;margin-top:3px;font-size:11px;line-height:1.15;color:rgba(29,46,35,.72)}
+#status{max-width:76%}
+.counter{font-weight:bold;color:#fff;white-space:nowrap}
+.qr-tile{display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#F7F4EE,#E9E2D5);color:#1D2E23}
+.qr-inner{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:22px}
+.qr-inner img{display:block;width:min(58%,220px);aspect-ratio:1/1;object-fit:contain;margin-bottom:12px;border-radius:8px}
+.qr-inner strong{display:block;font-size:22px;line-height:1.05;letter-spacing:.04em;text-transform:uppercase}
+.qr-inner span{display:block;margin-top:7px;font-size:15px;line-height:1.25;color:rgba(29,46,35,.7);max-width:260px}
 #empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#1D2E23,#0B0E0C);z-index:2;text-align:center;padding:80px}
 #empty h2{font-size:40px;margin:0 0 14px}
 #empty p{font-size:19px;color:var(--muted)}
@@ -57,7 +58,13 @@ h1 small{display:block;color:var(--gold);font-size:13px;letter-spacing:3px;text-
     <div class="tile empty"><img alt=""></div>
     <div class="tile empty"><img alt=""></div>
     <div class="tile empty"><img alt=""></div>
-    <div class="tile empty"><img alt=""></div>
+    <div class="qr-tile">
+      <div class="qr-inner">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUgAAAFIAQAAAAAab1qeAAAB0UlEQVR42u2au24EMQwDySD//8uTQpbtdCvXvAMOezCrAfVcG338/CjKKKOMMsrz+ZUk1zNeX8mqnz4JzwlPsakWzPqL75Pw/M5Ti5yR2Qx9nYTngxJZGyeh9O7PQ1SupIk7eYbSnCcd9QYvZxZQQmnOs53Y1b3q/H0SngOe24PGXd3LpoTSTOkd6cubu8rLVHF3+s+psrxoWbaEvZv5Y9JQ+qw0lmyQQY3RFONl2/AcxPudM/eQ1Kkg/pz6U7ZsKlnK8sqcXq4NpVl9NyvEr2YUWZj48yl/ViUSst0Rj8qfyZ/zfomeM9XjZtE9M1J4zuZ3LFbPKVwlyXtlF54jJbLAQjpVScaC7D+n8e5dlLSK0GmejBPvL/lzMewRs1IoJ+LD83t9d9f1SqISAlPehcT7UIlNebGSaD3WOpRQetgn+xo3ZXB384n3p36pJiHr32ikewEanhOe7iJUz9j4rJrCc6Ss6Z3jxUYLtRQJpXn/eV5usqGSefOtvrPreM2Zvfbk2DWUBvnTC+RyZVV4fFYj4fmkRHQjL4SgL4yE0ovS8k6p/VYu8/vr/RDWm46r/TR97SY8v/Pct0Aw9SJppVKxF0/hOdgvhVKUUUYZ5VD5Bz1a8qFiK2sZAAAAAElFTkSuQmCC" alt="QR code for the Hidden Faces guest app">
+        <strong>Scan to join</strong>
+        <span>Take and share your Hidden Faces photos</span>
+      </div>
+    </div>
   </div>
   <div class="wallshade"></div>
   <div id="empty" class="hidden"><div><h2 id="emptyTitle">Loading gallery…</h2><p id="emptyText">Guest photos will appear automatically.</p></div></div>
@@ -69,24 +76,19 @@ h1 small{display:block;color:var(--gold);font-size:13px;letter-spacing:3px;text-
     <span id="status">Connecting to the Hidden Faces gallery…</span>
     <span id="counter" class="counter"></span>
   </div>
-  <div class="qr-card" aria-label="Scan to open the Hidden Faces guest app">
-    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUgAAAFIAQAAAAAab1qeAAAB0UlEQVR42u2au24EMQwDySD//8uTQpbtdCvXvAMOezCrAfVcG338/CjKKKOMMsrz+ZUk1zNeX8mqnz4JzwlPsakWzPqL75Pw/M5Ti5yR2Qx9nYTngxJZGyeh9O7PQ1SupIk7eYbSnCcd9QYvZxZQQmnOs53Y1b3q/H0SngOe24PGXd3LpoTSTOkd6cubu8rLVHF3+s+psrxoWbaEvZv5Y9JQ+qw0lmyQQY3RFONl2/AcxPudM/eQ1Kkg/pz6U7ZsKlnK8sqcXq4NpVl9NyvEr2YUWZj48yl/ViUSst0Rj8qfyZ/zfomeM9XjZtE9M1J4zuZ3LFbPKVwlyXtlF54jJbLAQjpVScaC7D+n8e5dlLSK0GmejBPvL/lzMewRs1IoJ+LD83t9d9f1SqISAlPehcT7UIlNebGSaD3WOpRQetgn+xo3ZXB384n3p36pJiHr32ikewEanhOe7iJUz9j4rJrCc6Ss6Z3jxUYLtRQJpXn/eV5usqGSefOtvrPreM2Zvfbk2DWUBvnTC+RyZVV4fFYj4fmkRHQjL4SgL4yE0ovS8k6p/VYu8/vr/RDWm46r/TR97SY8v/Pct0Aw9SJppVKxF0/hOdgvhVKUUUYZ5VD5Bz1a8qFiK2sZAAAAAElFTkSuQmCC" alt="QR code for the Hidden Faces guest app">
-    <strong>Scan to join</strong>
-    <span>Take &amp; share your photos</span>
-  </div>
-</section>
+undefined</section>
 
 <script>
 (function(){
 "use strict";
 
-const BUILD_ID="2026.10.07.3";
+const BUILD_ID="2026.10.07.4";
 const CLOUD="ayyh0pzg";
 const EVENT="hiddenfaces2026";
 const GALLERY_MS=60000;
 const REFRESH_MS=10000;
 const VERSION_POLL_MS=30000;
-const WALL_SIZE=6;
+const WALL_SIZE=5;
 
 const PROFILES=[
   {id:"dining",name:"Dining Hall",video:""},
@@ -170,7 +172,7 @@ async function showGallery(){
   releaseVideo();
   wall.classList.remove("hidden");
   badge.innerHTML="<b>LIVE</b> Gallery";
-  status.textContent="Six live guest photos. New uploads replace the oldest photo automatically.";
+  status.textContent="Five live guest photos. New uploads replace the oldest photo automatically.";
   await fetchGallery();
   if(active&&active.video){
     phaseTimer=setTimeout(()=>{if(galleryActive)playVideo();},GALLERY_MS);
@@ -240,7 +242,7 @@ function fillInitial(photos){
 
 function updateCounter(){
   const n=slots.filter(s=>s.photo).length;
-  counter.textContent=n+" of 6 photos";
+  counter.textContent=n+" of 5 photos";
   empty.classList.toggle("hidden",n>0);
   if(n===0){
     emptyTitle.textContent="Waiting for guest photos";
