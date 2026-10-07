@@ -22,6 +22,8 @@ h1 small{display:block;color:var(--gold);font-size:13px;letter-spacing:3px;text-
 .name{display:block;font-size:19px;font-weight:bold;line-height:1.08}
 #player{background:#070907}
 #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;display:none}
+#youtubeWrap{position:absolute;inset:0;background:#000;display:none}
+#youtubePlayer,#youtubePlayer iframe{width:100%;height:100%;border:0}
 #wall{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:5px;background:#111812}
 .tile{position:relative;overflow:hidden;background:linear-gradient(145deg,#24382b,#111812)}
 .tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.02);transition:opacity .75s ease,transform 1.1s ease}
@@ -52,6 +54,7 @@ h1 small{display:block;color:var(--gold);font-size:13px;letter-spacing:3px;text-
 
 <section id="player" class="screen hidden">
   <video id="video" playsinline></video>
+  <div id="youtubeWrap"><div id="youtubePlayer"></div></div>
   <div id="wall">
     <div class="tile empty"><img alt=""></div>
     <div class="tile empty"><img alt=""></div>
@@ -76,13 +79,13 @@ h1 small{display:block;color:var(--gold);font-size:13px;letter-spacing:3px;text-
     <span id="status">Connecting to the Hidden Faces gallery…</span>
     <span id="counter" class="counter"></span>
   </div>
-undefined</section>
+</section>
 
 <script>
 (function(){
 "use strict";
 
-const BUILD_ID="2026.10.07.4";
+const BUILD_ID="2026.10.07.5";
 const CLOUD="ayyh0pzg";
 const EVENT="hiddenfaces2026";
 const GALLERY_MS=60000;
@@ -91,26 +94,27 @@ const VERSION_POLL_MS=30000;
 const WALL_SIZE=5;
 
 const PROFILES=[
-  {id:"dining",name:"Dining Hall",video:""},
-  {id:"admin",name:"Admin Building",video:""},
-  {id:"wellness",name:"Wellness Center",video:""},
-  {id:"education",name:"Education Building / Job Opportunities",video:""},
-  {id:"bowling",name:"Bowling Alley",video:""},
-  {id:"motion",name:"Dignity in Motion",video:""},
-  {id:"podcast",name:"Podcast Studio / Photo Booth",video:""},
-  {id:"salon",name:"Hair Salons",video:""},
-  {id:"gym",name:"Gym / Spa / Saunas / Pool",video:""},
-  {id:"living",name:"Arcade / Living Room",video:""},
-  {id:"chapel",name:"Future Chapel",video:""},
-  {id:"store",name:"General Store",video:""}
+  {id:"dining",name:"Dining Hall",playlist:[]},
+  {id:"admin",name:"Admin Building",playlist:[]},
+  {id:"wellness",name:"Wellness Center",playlist:[]},
+  {id:"education",name:"Education Building / Job Opportunities",playlist:[]},
+  {id:"bowling",name:"Bowling Alley",playlist:[]},
+  {id:"motion",name:"Dignity in Motion",playlist:[]},
+  {id:"podcast",name:"Podcast Studio / Photo Booth",playlist:[]},
+  {id:"salon",name:"Hair Salons",playlist:[]},
+  {id:"gym",name:"Gym / Spa / Saunas / Pool",playlist:[]},
+  {id:"living",name:"Arcade / Living Room",playlist:[]},
+  {id:"chapel",name:"Future Chapel",playlist:[]},
+  {id:"store",name:"General Store",playlist:[]}
 ];
 
 const $=id=>document.getElementById(id);
-const menu=$("menu"),player=$("player"),grid=$("grid"),video=$("video"),wall=$("wall"),empty=$("empty"),emptyTitle=$("emptyTitle"),emptyText=$("emptyText"),locationEl=$("location"),badge=$("badge"),status=$("status"),counter=$("counter");
+const menu=$("menu"),player=$("player"),grid=$("grid"),video=$("video"),youtubeWrap=$("youtubeWrap"),wall=$("wall"),empty=$("empty"),emptyTitle=$("emptyTitle"),emptyText=$("emptyText"),locationEl=$("location"),badge=$("badge"),status=$("status"),counter=$("counter");
 const tiles=[...document.querySelectorAll(".tile")];
 
 let selected=Math.max(0,PROFILES.findIndex(p=>p.id===localStorage.getItem("hiddenFacesTvProfile")));
 let active=null,galleryActive=false,phaseTimer=null,refreshTimer=null,knownIds=new Set();
+let playlistCursor=0,ytPlayer=null,ytApiPromise=null,ytStartGuard=null;
 let slots=tiles.map((tile,index)=>({index,tile,img:tile.querySelector("img"),photo:null}));
 
 function renderMenu(){
@@ -134,6 +138,7 @@ function move(dx,dy){
 
 function start(){
   active=PROFILES[selected];
+  playlistCursor=0;
   localStorage.setItem("hiddenFacesTvProfile",active.id);
   menu.classList.add("hidden");
   player.classList.remove("hidden");
@@ -143,27 +148,127 @@ function start(){
   refreshTimer=setInterval(fetchGallery,REFRESH_MS);
 }
 
-function begin(){active&&active.video?playVideo():showGallery();}
+function hasMedia(profile){
+  return !!(profile&&Array.isArray(profile.playlist)&&profile.playlist.length);
+}
+
+function currentMedia(){
+  if(!hasMedia(active))return null;
+  return active.playlist[playlistCursor%active.playlist.length];
+}
+
+function advanceMedia(){
+  if(hasMedia(active))playlistCursor=(playlistCursor+1)%active.playlist.length;
+}
+
+function begin(){hasMedia(active)?playVideo():showGallery();}
+
+function loadYouTubeApi(){
+  if(window.YT&&window.YT.Player)return Promise.resolve();
+  if(ytApiPromise)return ytApiPromise;
+  ytApiPromise=new Promise((resolve,reject)=>{
+    const previous=window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady=()=>{
+      if(typeof previous==="function")try{previous()}catch(e){}
+      resolve();
+    };
+    const s=document.createElement("script");
+    s.src="https://www.youtube.com/iframe_api";
+    s.async=true;
+    s.onerror=()=>reject(new Error("YouTube API failed to load"));
+    document.head.appendChild(s);
+    setTimeout(()=>reject(new Error("YouTube API timeout")),12000);
+  });
+  return ytApiPromise;
+}
+
+function youtubeEnded(event){
+  if(window.YT&&event.data===YT.PlayerState.ENDED){
+    clearTimeout(ytStartGuard);
+    showGallery();
+  }
+}
+
+function youtubeError(){
+  clearTimeout(ytStartGuard);
+  status.textContent="Video unavailable. Returning to the live gallery.";
+  setTimeout(showGallery,1200);
+}
+
+async function playYouTube(videoId){
+  youtubeWrap.style.display="block";
+  video.style.display="none";
+  try{
+    await loadYouTubeApi();
+    if(!ytPlayer){
+      ytPlayer=new YT.Player("youtubePlayer",{
+        videoId:videoId,
+        playerVars:{
+          autoplay:1,
+          controls:0,
+          rel:0,
+          playsinline:1,
+          fs:0,
+          disablekb:1,
+          iv_load_policy:3
+        },
+        events:{
+          onReady:e=>{e.target.loadVideoById(videoId);e.target.playVideo();},
+          onStateChange:youtubeEnded,
+          onError:youtubeError
+        }
+      });
+    }else{
+      ytPlayer.loadVideoById(videoId);
+      ytPlayer.playVideo();
+    }
+    clearTimeout(ytStartGuard);
+    ytStartGuard=setTimeout(()=>{
+      try{
+        const state=ytPlayer&&ytPlayer.getPlayerState?ytPlayer.getPlayerState():-1;
+        if(window.YT&&state!==YT.PlayerState.PLAYING&&state!==YT.PlayerState.BUFFERING){
+          youtubeError();
+        }
+      }catch(e){youtubeError();}
+    },10000);
+  }catch(e){
+    youtubeError();
+  }
+}
 
 function playVideo(){
+  const media=currentMedia();
+  if(!media){showGallery();return;}
   galleryActive=false;
   clearTimeout(phaseTimer);
   wall.classList.add("hidden");
   empty.classList.add("hidden");
   badge.innerHTML="<b>NOW</b> Video";
-  status.textContent="Streaming this location's film.";
+  status.textContent="Playing "+active.name+".";
   counter.textContent="";
+
+  if(media.type==="youtube"&&media.id){
+    playYouTube(media.id);
+    return;
+  }
+
+  youtubeWrap.style.display="none";
   video.style.display="block";
-  video.src=active.video;
+  video.src=media.src||"";
   video.currentTime=0;
-  video.play().catch(()=>showGallery());
+  video.play().catch(()=>youtubeError());
 }
 
 function releaseVideo(){
+  clearTimeout(ytStartGuard);
   try{video.pause()}catch(e){}
   video.removeAttribute("src");
   try{video.load()}catch(e){}
   video.style.display="none";
+  if(ytPlayer&&ytPlayer.stopVideo){
+    try{ytPlayer.stopVideo()}catch(e){}
+  }
+  youtubeWrap.style.display="none";
 }
 
 async function showGallery(){
@@ -174,8 +279,13 @@ async function showGallery(){
   badge.innerHTML="<b>LIVE</b> Gallery";
   status.textContent="Five live guest photos. New uploads replace the oldest photo automatically.";
   await fetchGallery();
-  if(active&&active.video){
-    phaseTimer=setTimeout(()=>{if(galleryActive)playVideo();},GALLERY_MS);
+  if(hasMedia(active)){
+    phaseTimer=setTimeout(()=>{
+      if(galleryActive){
+        advanceMedia();
+        playVideo();
+      }
+    },GALLERY_MS);
   }
 }
 
@@ -305,6 +415,20 @@ function back(){
   renderMenu();
 }
 
+async function loadConfig(){
+  try{
+    const r=await fetch("./config.json?_="+Date.now(),{cache:"no-store"});
+    if(!r.ok)return;
+    const cfg=await r.json();
+    if(cfg&&cfg.profiles){
+      PROFILES.forEach(p=>{
+        const remote=cfg.profiles[p.id];
+        if(remote&&Array.isArray(remote.playlist))p.playlist=remote.playlist;
+      });
+    }
+  }catch(e){}
+}
+
 async function checkForUpdate(){
   try{
     const r=await fetch("./version.json?_="+Date.now(),{cache:"no-store"});
@@ -331,16 +455,21 @@ document.addEventListener("keydown",e=>{
 });
 
 window.TV={androidBack:back};
-renderMenu();
-setInterval(checkForUpdate,VERSION_POLL_MS);
 
-// Once a TV has been assigned a location, normal launches go straight back to it.
-const saved=localStorage.getItem("hiddenFacesTvProfile");
-if(saved&&location.search.indexOf("menu=1")===-1){
-  const i=PROFILES.findIndex(p=>p.id===saved);
-  if(i>=0){selected=i;setTimeout(start,350);}
+async function init(){
+  await loadConfig();
+  renderMenu();
+  setInterval(checkForUpdate,VERSION_POLL_MS);
+
+  // Once a TV has been assigned a location, normal launches go straight back to it.
+  const saved=localStorage.getItem("hiddenFacesTvProfile");
+  if(saved&&location.search.indexOf("menu=1")===-1){
+    const i=PROFILES.findIndex(p=>p.id===saved);
+    if(i>=0){selected=i;setTimeout(start,350);}
+  }
+  document.body.focus();
 }
-document.body.focus();
+init();
 })();
 </script>
 </body>

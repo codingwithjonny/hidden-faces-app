@@ -1,0 +1,46 @@
+{
+  "gallerySeconds": 60,
+  "profiles": {
+    "dining": {
+      "playlist": []
+    },
+    "admin": {
+      "playlist": []
+    },
+    "wellness": {
+      "playlist": []
+    },
+    "education": {
+      "playlist": []
+    },
+    "bowling": {
+      "playlist": []
+    },
+    "motion": {
+      "playlist": [
+        {
+          "type": "youtube",
+          "id": "4-uLKs2PXdc"
+        }
+      ]
+    },
+    "podcast": {
+      "playlist": []
+    },
+    "salon": {
+      "playlist": []
+    },
+    "gym": {
+      "playlist": []
+    },
+    "living": {
+      "playlist": []
+    },
+    "chapel": {
+      "playlist": []
+    },
+    "store": {
+      "playlist": []
+    }
+  }
+}
