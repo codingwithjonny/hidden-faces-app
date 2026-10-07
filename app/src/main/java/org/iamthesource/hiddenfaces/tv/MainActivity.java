@@ -1,18 +1,24 @@
 package org.iamthesource.hiddenfaces.tv;
 
 import android.app.Activity;
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 public class MainActivity extends Activity {
+  private static final String REMOTE_URL = "https://codingwithjonny.github.io/hidden-faces-app/tv/";
+  private static final String FALLBACK_URL = "file:///android_asset/tv/fallback.html";
   private WebView webView;
+  private boolean mainFrameLoaded = false;
 
   @Override protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
@@ -30,13 +36,27 @@ public class MainActivity extends Activity {
     s.setMediaPlaybackRequiresUserGesture(false);
     s.setAllowFileAccess(true);
     s.setAllowContentAccess(true);
-    s.setAllowFileAccessFromFileURLs(true);
-    s.setAllowUniversalAccessFromFileURLs(true);
+    s.setCacheMode(WebSettings.LOAD_DEFAULT);
 
-    webView.setWebViewClient(new WebViewClient());
     webView.setWebChromeClient(new WebChromeClient());
+    webView.setWebViewClient(new WebViewClient() {
+      @Override public void onPageStarted(WebView view, String url, Bitmap favicon) {
+        if (url != null && url.startsWith("https://codingwithjonny.github.io/")) mainFrameLoaded = false;
+      }
+
+      @Override public void onPageFinished(WebView view, String url) {
+        if (url != null && url.startsWith("https://codingwithjonny.github.io/")) mainFrameLoaded = true;
+      }
+
+      @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+        if (request != null && request.isForMainFrame() && !mainFrameLoaded) {
+          view.loadUrl(FALLBACK_URL);
+        }
+      }
+    });
+
     setContentView(webView);
-    webView.loadUrl("file:///android_asset/tv/index.html");
+    webView.loadUrl(REMOTE_URL);
     webView.requestFocus();
   }
 
@@ -53,7 +73,12 @@ public class MainActivity extends Activity {
 
   @Override public boolean onKeyDown(int keyCode, KeyEvent event) {
     if (keyCode == KeyEvent.KEYCODE_BACK && webView != null) {
-      webView.evaluateJavascript("window.TV&&window.TV.androidBack?window.TV.androidBack():null;", null);
+      String url = webView.getUrl();
+      if (url != null && url.startsWith("file:")) {
+        webView.loadUrl(REMOTE_URL + "?menu=1");
+      } else {
+        webView.evaluateJavascript("window.TV&&window.TV.androidBack?window.TV.androidBack():null;", null);
+      }
       return true;
     }
     return super.onKeyDown(keyCode, event);
