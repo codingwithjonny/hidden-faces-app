@@ -1,0 +1,336 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111812">
+<title>Hidden Faces TV</title>
+<style>
+:root{--pine:#1D2E23;--bone:#F7F4EE;--gold:#E0A226;--muted:rgba(247,244,238,.62)}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0B0E0C;color:var(--bone);font-family:Arial,sans-serif}
+button{font:inherit}
+.screen{position:fixed;inset:0}
+.hidden{display:none!important}
+#menu{padding:44px 56px 38px;background:radial-gradient(circle at 20% 0%,#35523e 0,var(--pine) 38%,#111812 100%)}
+h1{margin:0 0 26px;font-size:38px}
+h1 small{display:block;color:var(--gold);font-size:15px;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;height:calc(100vh - 120px)}
+.card{border:2px solid rgba(247,244,238,.13);border-radius:20px;background:rgba(247,244,238,.055);color:var(--bone);padding:22px 24px;text-align:left;outline:none}
+.card.sel{border-color:var(--gold);box-shadow:0 0 0 5px rgba(224,162,38,.16);transform:scale(1.025)}
+.num{display:block;color:var(--gold);font-size:13px;font-weight:bold;letter-spacing:2px;margin-bottom:12px}
+.name{display:block;font-size:22px;font-weight:bold;line-height:1.1}
+#player{background:#070907}
+#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;display:none}
+#wall{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:5px;background:#111812}
+.tile{position:relative;overflow:hidden;background:linear-gradient(145deg,#24382b,#111812)}
+.tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.02);transition:opacity .75s ease,transform 1.1s ease}
+.tile img.on{opacity:1;transform:scale(1)}
+.tile.empty:after{content:"Hidden Faces";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(247,244,238,.18);font-size:20px;font-weight:bold;letter-spacing:2px;text-transform:uppercase}
+.wallshade{position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,.28),transparent 20%,transparent 76%,rgba(0,0,0,.42))}
+.top{position:absolute;left:28px;right:28px;top:24px;display:flex;justify-content:space-between;align-items:center;z-index:4;text-shadow:0 2px 10px #000;font-size:25px;font-weight:bold}
+.badge{font-size:13px;background:rgba(17,24,18,.8);padding:10px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.18)}
+.badge b{color:var(--gold)}
+.bottom{position:absolute;left:28px;right:28px;bottom:20px;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;z-index:4;color:#eee;text-shadow:0 2px 10px #000;font-size:13px}
+#status{max-width:76%}
+.counter{font-weight:bold;color:#fff;white-space:nowrap}
+#empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#1D2E23,#0B0E0C);z-index:2;text-align:center;padding:80px}
+#empty h2{font-size:40px;margin:0 0 14px}
+#empty p{font-size:19px;color:var(--muted)}
+</style>
+</head>
+<body tabindex="0">
+<section id="menu" class="screen">
+  <h1><small>The Source</small>Hidden Faces 2026</h1>
+  <div id="grid" class="grid"></div>
+</section>
+
+<section id="player" class="screen hidden">
+  <video id="video" playsinline></video>
+  <div id="wall">
+    <div class="tile empty"><img alt=""></div>
+    <div class="tile empty"><img alt=""></div>
+    <div class="tile empty"><img alt=""></div>
+    <div class="tile empty"><img alt=""></div>
+    <div class="tile empty"><img alt=""></div>
+    <div class="tile empty"><img alt=""></div>
+  </div>
+  <div class="wallshade"></div>
+  <div id="empty" class="hidden"><div><h2 id="emptyTitle">Loading gallery…</h2><p id="emptyText">Guest photos will appear automatically.</p></div></div>
+  <div class="top">
+    <span id="location"></span>
+    <span id="badge" class="badge"><b>LIVE</b> Gallery</span>
+  </div>
+  <div class="bottom">
+    <span id="status">Connecting to the Hidden Faces gallery…</span>
+    <span id="counter" class="counter"></span>
+  </div>
+</section>
+
+<script>
+(function(){
+"use strict";
+
+const BUILD_ID="2026.10.07.1";
+const CLOUD="ayyh0pzg";
+const EVENT="hiddenfaces2026";
+const GALLERY_MS=60000;
+const REFRESH_MS=10000;
+const VERSION_POLL_MS=30000;
+const WALL_SIZE=6;
+
+const PROFILES=[
+  {id:"dining",name:"Dining Hall",video:""},
+  {id:"admin",name:"Admin Building",video:""},
+  {id:"wellness",name:"Wellness Center",video:""},
+  {id:"education",name:"Education Building / Job Opportunities",video:""},
+  {id:"bowling",name:"Bowling Alley",video:""},
+  {id:"motion",name:"Dignity in Motion",video:""},
+  {id:"podcast",name:"Podcast Studio / Photo Booth",video:""},
+  {id:"salon",name:"Hair Salons",video:""},
+  {id:"gym",name:"Gym / Spa / Saunas / Pool",video:""},
+  {id:"living",name:"Arcade / Living Room",video:""},
+  {id:"chapel",name:"Future Chapel",video:""},
+  {id:"store",name:"General Store",video:""}
+];
+
+const $=id=>document.getElementById(id);
+const menu=$("menu"),player=$("player"),grid=$("grid"),video=$("video"),wall=$("wall"),empty=$("empty"),emptyTitle=$("emptyTitle"),emptyText=$("emptyText"),locationEl=$("location"),badge=$("badge"),status=$("status"),counter=$("counter");
+const tiles=[...document.querySelectorAll(".tile")];
+
+let selected=Math.max(0,PROFILES.findIndex(p=>p.id===localStorage.getItem("hiddenFacesTvProfile")));
+let active=null,galleryActive=false,phaseTimer=null,refreshTimer=null,knownIds=new Set();
+let slots=tiles.map((tile,index)=>({index,tile,img:tile.querySelector("img"),photo:null}));
+
+function renderMenu(){
+  grid.innerHTML="";
+  PROFILES.forEach((p,i)=>{
+    const b=document.createElement("button");
+    b.className="card"+(i===selected?" sel":"");
+    b.innerHTML='<span class="num">SCREEN '+String(i+1).padStart(2,"0")+'</span><span class="name">'+p.name+'</span>';
+    b.onclick=()=>{selected=i;start()};
+    grid.appendChild(b);
+  });
+}
+
+function move(dx,dy){
+  const cols=4,row=Math.floor(selected/cols),col=selected%cols;
+  let nr=Math.max(0,Math.min(2,row+dy));
+  let nc=Math.max(0,Math.min(3,col+dx));
+  selected=Math.min(PROFILES.length-1,nr*cols+nc);
+  renderMenu();
+}
+
+function start(){
+  active=PROFILES[selected];
+  localStorage.setItem("hiddenFacesTvProfile",active.id);
+  menu.classList.add("hidden");
+  player.classList.remove("hidden");
+  locationEl.textContent=active.name;
+  clearTimers();
+  begin();
+  refreshTimer=setInterval(fetchGallery,REFRESH_MS);
+}
+
+function begin(){active&&active.video?playVideo():showGallery();}
+
+function playVideo(){
+  galleryActive=false;
+  clearTimeout(phaseTimer);
+  wall.classList.add("hidden");
+  empty.classList.add("hidden");
+  badge.innerHTML="<b>NOW</b> Video";
+  status.textContent="Streaming this location's film.";
+  counter.textContent="";
+  video.style.display="block";
+  video.src=active.video;
+  video.currentTime=0;
+  video.play().catch(()=>showGallery());
+}
+
+function releaseVideo(){
+  try{video.pause()}catch(e){}
+  video.removeAttribute("src");
+  try{video.load()}catch(e){}
+  video.style.display="none";
+}
+
+async function showGallery(){
+  galleryActive=true;
+  clearTimeout(phaseTimer);
+  releaseVideo();
+  wall.classList.remove("hidden");
+  badge.innerHTML="<b>LIVE</b> Gallery";
+  status.textContent="Six live guest photos. New uploads replace the oldest photo automatically.";
+  await fetchGallery();
+  if(active&&active.video){
+    phaseTimer=setTimeout(()=>{if(galleryActive)playVideo();},GALLERY_MS);
+  }
+}
+
+function photoUrl(id){
+  return "https://res.cloudinary.com/"+CLOUD+"/image/upload/c_fill,w_900,h_600,q_auto,f_auto/"+id+".jpg";
+}
+
+function normalizeResources(resources){
+  const seen=new Set();
+  return (resources||[])
+    .filter(r=>r&&r.public_id)
+    .sort((a,b)=>String(a.created_at||"").localeCompare(String(b.created_at||"")))
+    .filter(r=>{
+      if(seen.has(r.public_id))return false;
+      seen.add(r.public_id);
+      return true;
+    })
+    .map(r=>({id:r.public_id,createdAt:r.created_at||"",url:photoUrl(r.public_id)}));
+}
+
+function oldestSlot(){
+  const filled=slots.filter(s=>s.photo);
+  if(filled.length<WALL_SIZE)return slots.find(s=>!s.photo);
+  return filled.slice().sort((a,b)=>String(a.photo.createdAt).localeCompare(String(b.photo.createdAt)))[0];
+}
+
+function replaceSlot(slot,photo){
+  if(!slot||!photo)return;
+  const previous=slot.photo;
+  slot.photo=photo;
+  const preload=new Image();
+  preload.onload=()=>{
+    slot.img.classList.remove("on");
+    setTimeout(()=>{
+      slot.img.src=photo.url;
+      slot.tile.classList.remove("empty");
+      void slot.img.offsetWidth;
+      slot.img.classList.add("on");
+      updateCounter();
+    },180);
+  };
+  preload.onerror=()=>{slot.photo=previous;updateCounter();};
+  preload.src=photo.url;
+}
+
+function fillInitial(photos){
+  const latest=photos.slice(-WALL_SIZE);
+  slots.forEach((slot,i)=>{
+    const p=latest[i];
+    if(!p){
+      slot.photo=null;
+      slot.img.removeAttribute("src");
+      slot.img.classList.remove("on");
+      slot.tile.classList.add("empty");
+      return;
+    }
+    slot.photo=p;
+    slot.tile.classList.remove("empty");
+    slot.img.src=p.url;
+    slot.img.onload=()=>slot.img.classList.add("on");
+  });
+  updateCounter();
+}
+
+function updateCounter(){
+  const n=slots.filter(s=>s.photo).length;
+  counter.textContent=n+" of 6 photos";
+  empty.classList.toggle("hidden",n>0);
+  if(n===0){
+    emptyTitle.textContent="Waiting for guest photos";
+    emptyText.textContent="Photos tagged for Hidden Faces 2026 will appear here automatically.";
+  }
+}
+
+function applyGallery(allPhotos){
+  if(!allPhotos.length){
+    if(!slots.some(s=>s.photo))updateCounter();
+    return;
+  }
+  if(!knownIds.size){
+    allPhotos.forEach(p=>knownIds.add(p.id));
+    fillInitial(allPhotos);
+    return;
+  }
+  const incoming=allPhotos.filter(p=>!knownIds.has(p.id));
+  allPhotos.forEach(p=>knownIds.add(p.id));
+  incoming.forEach(photo=>replaceSlot(oldestSlot(),photo));
+  updateCounter();
+}
+
+async function fetchGallery(){
+  if(!galleryActive)return;
+  try{
+    const r=await fetch("https://res.cloudinary.com/"+CLOUD+"/image/list/"+EVENT+".json?_="+Date.now(),{cache:"no-store"});
+    if(r.status===404){if(!slots.some(s=>s.photo))updateCounter();return;}
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const j=await r.json();
+    const photos=normalizeResources(j.resources);
+    applyGallery(photos);
+    const loaded=slots.filter(s=>s.photo).length;
+    status.textContent=loaded
+      ?"Live guest gallery • new photos replace the oldest tile automatically."
+      :"Waiting for the first guest photo.";
+  }catch(e){
+    if(!slots.some(s=>s.photo)){
+      empty.classList.remove("hidden");
+      emptyTitle.textContent="Gallery connection interrupted";
+      emptyText.textContent="The TV will keep retrying automatically.";
+    }
+    status.textContent="Trying to reconnect to the shared gallery…";
+  }
+}
+
+function clearTimers(){
+  galleryActive=false;
+  clearTimeout(phaseTimer);
+  clearInterval(refreshTimer);
+  phaseTimer=refreshTimer=null;
+}
+
+function back(){
+  if(player.classList.contains("hidden"))return;
+  clearTimers();
+  releaseVideo();
+  player.classList.add("hidden");
+  menu.classList.remove("hidden");
+  renderMenu();
+}
+
+async function checkForUpdate(){
+  try{
+    const r=await fetch("./version.json?_="+Date.now(),{cache:"no-store"});
+    if(!r.ok)return;
+    const v=await r.json();
+    if(v&&v.build&&v.build!==BUILD_ID)location.reload();
+  }catch(e){}
+}
+
+video.addEventListener("ended",()=>showGallery());
+video.addEventListener("error",()=>{if(active&&active.video)showGallery();});
+
+document.addEventListener("keydown",e=>{
+  const k=e.key||({19:"ArrowUp",20:"ArrowDown",21:"ArrowLeft",22:"ArrowRight",23:"Enter",66:"Enter"}[e.keyCode]||"");
+  if(!player.classList.contains("hidden")){
+    if(k==="Escape"||k==="Backspace"){e.preventDefault();back();}
+    return;
+  }
+  if(k==="ArrowLeft"){e.preventDefault();move(-1,0)}
+  else if(k==="ArrowRight"){e.preventDefault();move(1,0)}
+  else if(k==="ArrowUp"){e.preventDefault();move(0,-1)}
+  else if(k==="ArrowDown"){e.preventDefault();move(0,1)}
+  else if(k==="Enter"){e.preventDefault();start()}
+});
+
+window.TV={androidBack:back};
+renderMenu();
+setInterval(checkForUpdate,VERSION_POLL_MS);
+
+// Once a TV has been assigned a location, normal launches go straight back to it.
+const saved=localStorage.getItem("hiddenFacesTvProfile");
+if(saved&&location.search.indexOf("menu=1")===-1){
+  const i=PROFILES.findIndex(p=>p.id===saved);
+  if(i>=0){selected=i;setTimeout(start,350);}
+}
+document.body.focus();
+})();
+</script>
+</body>
+</html>
